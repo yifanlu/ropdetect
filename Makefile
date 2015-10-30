@@ -2,6 +2,7 @@ ifeq ($(KERNELRELEASE),)
 
 KERNELDIR ?= ~/linux
 PWD := $(shell pwd)
+CFLAGS := -gnu99
 
 .PHONY: build clean
 
