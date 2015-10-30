@@ -12,6 +12,8 @@
 #define PMU_REGS_OFFSET 0x1000
 #define PMU_REGS_SIZE 0x1000
 
+#define PMU_PMCNTENSET 0xC00
+#define PMU_PMLAR 0xFB0
 #define PMU_PMCR 0xE04
 #define PMU_PMCCNTR 0x07C
 
@@ -29,10 +31,10 @@ static void get_current_debug_regs(void *info)
 
   asm("mrc p15,0,%0,c0,c0,5" : "=r" (mpidr));
   printk(KERN_DEBUG "Running on core %d\n", mpidr & 3);
-  asm("mrc p14,0,%0,c1,c0,0\t\n"
-      "mrc p14,0,r4,c2,c0,0\t\n"
-      "add %0,r4\t\n"
-      "bic %0,#7\t\n" : "=r" (base) :: "r4", "memory"
+  asm(//"mrc p14,0,%0,c1,c0,0\t\n" // disabled due to bug in BRCM CPU
+      "mrc p14,0,%0,c2,c0,0\t\n"
+      //"add %0,r4\t\n"
+      "bic %0,#7\t\n" : "=r" (base) :: "memory"
     );
   *(phys_addr_t *)info = base;
 }
@@ -49,22 +51,27 @@ static int init_ropdetect(void)
   }
 
   pmu_base = pmu_phys_base+PMU_REGS_OFFSET;
+  printk(KERN_DEBUG "PMU base: 0x%08X\n", pmu_base);
   if ((pmu_resource = request_mem_region(pmu_base, PMU_REGS_SIZE, "pmu")) == NULL)
   {
     printk(KERN_ALERT "Failed to request PMU memory region 0x%08X\n", pmu_base);
     return -1;
   }
 
-  if ((pmu_regs = ioremap(pmu_base, PMU_REGS_SIZE)) == NULL)
+  if ((pmu_regs = ioremap_nocache(pmu_base, PMU_REGS_SIZE)) == NULL)
   {
     printk(KERN_ALERT "Failed to map PMU memory region 0x%08X\n", pmu_base);
   }
 
   pmcr = ioread32(pmu_regs+PMU_PMCR);
+  // unlock regs
+  iowrite32(0xC5ACCE55, pmu_regs+PMU_PMLAR);
   // TODO: set up events here
   printk(KERN_DEBUG "Found %d event counters\n", (pmcr >> 11) & 0x1F);
   pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
   iowrite32(pmcr, pmu_regs+PMU_PMCR);
+  // start counter
+  iowrite32(0x80000000, pmu_regs+PMU_PMCNTENSET);
   for (int i = 0; i < 10000; i++); // wait a bit
   printk(KERN_DEBUG "Counts: 0x%08X\n", ioread32(pmu_regs+PMU_PMCCNTR));
 
