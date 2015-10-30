@@ -1,33 +1,81 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/ioport.h>
+#include <asm/io.h>
+#include <linux/smp.h>
 #define DRIVER_AUTHOR "Yifan Lu <yifanlu@stanford.edu>"
 #define DRIVER_DESC   "ROP detection through pref monitor"
+
+#define CPU0 0
+#define CPU1 1
+#define PMU_REGS_OFFSET 0x1000
+#define PMU_REGS_SIZE 0x1000
+
+#define PMU_PMCR 0xE04
+#define PMU_PMCCNTR 0x07C
+
+static phys_addr_t pmu_phys_base;
+static struct resource *pmu_resource;
+static void *pmu_regs;
 
 static int init_ropdetect(void);
 static void cleanup_ropdetect(void);
 
-static phys_addr_t get_current_debug_regs(void)
+static void get_current_debug_regs(void *info)
 {
   phys_addr_t base;
-  asm ("mrc p14,0,%0,c1,c0,0\t\n"
-       "mrc p14,0,r4,c2,c0,0\t\n"
-       "add %0,r4\t\n"
-       "bic %0,#7\t\n" : "=r" (base) :: "r4", "memory"
-      );
-  return base;
+  int mpidr
+
+  asm("mrc p15,0,%0,c0,c0,5" : "=r" (mpidr));
+  printk(KERN_DEBUG "Running on core %d\n", mpidr & 3);
+  asm("mrc p14,0,%0,c1,c0,0\t\n"
+      "mrc p14,0,r4,c2,c0,0\t\n"
+      "add %0,r4\t\n"
+      "bic %0,#7\t\n" : "=r" (base) :: "r4", "memory"
+    );
+  *(phys_addr_t *)info = base;
 }
 
 static int init_ropdetect(void)
 {
-   printk(KERN_ALERT "Hello, world: 0x%08X\n", get_current_debug_regs());
-   return -1;
+  phys_addr_t pmu_base;
+  unsigned int pmcr;
+
+  if (smp_call_function_single(CPU0, get_current_debug_regs, &pmu_phys_base, 1) < 0)
+  {
+    printk(KERN_ALERT "Unable to find debug regs for core 0\n");
+    return -1;
+  }
+
+  pmu_base = pmu_phys_base+PMU_REGS_OFFSET;
+  if ((pmu_resource = request_mem_region(pmu_base, PMU_REGS_SIZE, "pmu")) == NULL)
+  {
+    printk(KERN_ALERT "Failed to request PMU memory region 0x%08X\n", pmu_base);
+    return -1;
+  }
+
+  if ((pmu_regs = ioremap(pmu_base, PMU_REGS_SIZE)) == NULL)
+  {
+    printk(KERN_ALERT "Failed to map PMU memory region 0x%08X\n", pmu_base);
+  }
+
+  pmcr = ioread32(pmu_regs+PMU_PMCR);
+  // TODO: set up events here
+  printk(KERN_DEBUG "Found %d event counters\n", (pmcr >> 11) & 0x1F);
+  pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
+  iowrite32(pmu_regs+PMU_PMCR, pmcr);
+  for (int i = 0; i < 10000; i++); // wait a bit
+  printk(KERN_DEBUG "Counts: 0x%08X\n", ioread32(pmu_regs+PMU_PMCCNTR));
+
+  return 0;
 }
 
 
 static void cleanup_ropdetect(void)
 {
-   printk(KERN_ALERT "Goodbye, world 4\n");
+  release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
+  iounmap(pmu_regs);
 }
 
 
