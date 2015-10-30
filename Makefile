@@ -2,7 +2,6 @@ ifeq ($(KERNELRELEASE),)
 
 KERNELDIR ?= ~/linux
 PWD := $(shell pwd)
-CFLAGS := -gnu99
 
 .PHONY: build clean
 
@@ -15,5 +14,6 @@ else
 
 $(info Building with KERNELRELEASE = ${KERNELRELEASE})
 obj-m :=    ropdetect.o
+CFLAGS_ropdetect.o := -std=gnu99
 
 endif

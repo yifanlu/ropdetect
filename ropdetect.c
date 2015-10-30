@@ -25,7 +25,7 @@ static void cleanup_ropdetect(void);
 static void get_current_debug_regs(void *info)
 {
   phys_addr_t base;
-  int mpidr
+  int mpidr;
 
   asm("mrc p15,0,%0,c0,c0,5" : "=r" (mpidr));
   printk(KERN_DEBUG "Running on core %d\n", mpidr & 3);
@@ -64,7 +64,7 @@ static int init_ropdetect(void)
   // TODO: set up events here
   printk(KERN_DEBUG "Found %d event counters\n", (pmcr >> 11) & 0x1F);
   pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
-  iowrite32(pmu_regs+PMU_PMCR, pmcr);
+  iowrite32(pmcr, pmu_regs+PMU_PMCR);
   for (int i = 0; i < 10000; i++); // wait a bit
   printk(KERN_DEBUG "Counts: 0x%08X\n", ioread32(pmu_regs+PMU_PMCCNTR));
 
