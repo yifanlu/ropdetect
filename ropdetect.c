@@ -90,11 +90,11 @@ static void setup_events(void)
 
 static inline void update_counts(int *cycles, int events[4])
 {
-  *cycles = ioread32(PMU_PMCCNTR);
-  events[0] = ioread32(PMU_PMXEVCNTR0);
-  events[1] = ioread32(PMU_PMXEVCNTR1);
-  events[2] = ioread32(PMU_PMXEVCNTR2);
-  events[3] = ioread32(PMU_PMXEVCNTR3);
+  *cycles = ioread32(pmu_regs+PMU_PMCCNTR);
+  events[0] = ioread32(pmu_regs+PMU_PMXEVCNTR0);
+  events[1] = ioread32(pmu_regs+PMU_PMXEVCNTR1);
+  events[2] = ioread32(pmu_regs+PMU_PMXEVCNTR2);
+  events[3] = ioread32(pmu_regs+PMU_PMXEVCNTR3);
 }
 
 static int init_ropdetect(void)
@@ -127,8 +127,14 @@ static int init_ropdetect(void)
   printk(KERN_DEBUG "Found %d event counters\n", (pmcr >> 11) & 0x1F);
   if (((pmcr >> 11) & 0x1F) < 4)
   {
-    printk(KERN_WARN "Not enough event counters! Results will be flawed.\n");
+    printk(KERN_WARNING "Not enough event counters! Results will be flawed.\n");
   }
+  // clear events
+  pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
+  iowrite32(pmcr, pmu_regs+PMU_PMCR);
+  // clear overflow
+  iowrite32(0xFFFFFFFF, pmu_regs+PMU_PMOVSR);
+  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENSET);
 
   // create monitor thread
   monitor_task = kthread_create(monitor_thread, NULL, "ropdetect_monitor");
@@ -162,20 +168,13 @@ static int monitor_thread(void *data)
   cpu = get_cpu();
   if (cpu != CPU_MONITOR)
   {
-    printk(KERN_ERROR "Running on invalid CPU %d\n", cpu);
+    printk(KERN_ERR "Running on invalid CPU %d\n", cpu);
     put_cpu();
     return -1;
   }
 
   // setup event collection
   setup_events();
-
-  // clear events
-  pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
-  iowrite32(pmcr, pmu_regs+PMU_PMCR);
-  // clear overflow
-  iowrite32(0xFFFFFFFF, pmu_regs+PMU_PMOVSR);
-  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENSET);
 
   cycles = 0;
   while (!kthread_should_stop())
