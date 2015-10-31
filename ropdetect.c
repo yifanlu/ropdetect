@@ -62,7 +62,6 @@ static phys_addr_t pmu_phys_base;
 static struct resource *pmu_resource;
 static void *pmu_regs;
 static struct task_struct *monitor_task;
-static int is_running_monitor;
 
 static int monitor_thread(void *data);
 
@@ -153,7 +152,7 @@ static int init_ropdetect(void)
 static void cleanup_ropdetect(void)
 {
   // stop monitor thread
-  is_running_monitor = 0;
+  kthread_stop(monitor_task);
   // stop event collection
   iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
   release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
@@ -174,13 +173,11 @@ static int monitor_thread(void *data)
     return -1;
   }
 
-  is_running_monitor = 1;
-
   // setup event collection
   setup_events();
 
   cycles = 0;
-  while (is_running_monitor)
+  while (!kthread_should_stop())
   {
     last_cycles = cycles;
     memcpy(last_counts, counts, sizeof(counts));
