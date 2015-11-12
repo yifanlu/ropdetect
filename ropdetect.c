@@ -61,6 +61,17 @@ enum armv7_perf_types {
   ARMV7_PERFCTR_CPU_CYCLES    = 0xFF
 };
 
+// default collection ids
+static int collect_ids[MAX_EVENT_COUNTERS] = {
+  ARMV7_PERFCTR_IFETCH_MISS, 
+  ARMV7_PERFCTR_ITLB_MISS, 
+  ARMV7_PERFCTR_PC_BRANCH_MIS_PRED, 
+  ARMV7_PERFCTR_PC_IMM_BRANCH
+};
+
+module_param_array(collect_ids, int, NULL, 0);
+MODULE_PARM_DESC(collect_ids, "Array of event ids to collect");
+
 static phys_addr_t pmu_phys_base;
 static struct resource *pmu_resource;
 static void *pmu_regs;
@@ -169,16 +180,17 @@ static void cleanup_ropdetect(void)
 static void setup_events(void)
 {
   int pmcr;
+  int i;
 
   // setup pmu
   pmcr = ioread32(pmu_regs+PMU_PMCR);
   pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
   iowrite32(pmcr, pmu_regs+PMU_PMCR);
 
-  iowrite32(ARMV7_PERFCTR_IFETCH_MISS, pmu_regs+PMU_PMXEVTYPER0);
-  iowrite32(ARMV7_PERFCTR_ITLB_MISS, pmu_regs+PMU_PMXEVTYPER1);
-  iowrite32(ARMV7_PERFCTR_PC_BRANCH_MIS_PRED, pmu_regs+PMU_PMXEVTYPER2);
-  iowrite32(ARMV7_PERFCTR_PC_IMM_BRANCH, pmu_regs+PMU_PMXEVTYPER3);
+  for (i = 0; i < num_counters; i++)
+  {
+    iowrite32(collect_ids[i], pmu_regs+PMU_PMXEVTYPER0+4*i);
+  }
 
   // start collection
   iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENSET);
@@ -187,7 +199,7 @@ static void setup_events(void)
 static void cleanup_events(void)
 {
   int pmcr;
-  
+
   // disable counts
   pmcr = ioread32(pmu_regs+PMU_PMCR);
   pmcr = pmcr & ~1;
