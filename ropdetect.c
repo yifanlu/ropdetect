@@ -187,9 +187,7 @@ static void setup_events(void)
 static void cleanup_events(void)
 {
   int pmcr;
-
-  // stop collection
-  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
+  
   // disable counts
   pmcr = ioread32(pmu_regs+PMU_PMCR);
   pmcr = pmcr & ~1;
