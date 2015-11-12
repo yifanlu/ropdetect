@@ -4,13 +4,26 @@
 #include <fcntl.h>
 #include "ropdetect.h"
 
+// Number of cycles for each event probe
+#define TIME_DELTA 100
+
 int main(int argc, const char *argv[])
 {
+  const char *filename;
   int fp;
   pmu_events_t counters;
   pmu_events_t prev;
 
-  if ((fp = open("/proc/ropdetect", O_RDONLY)) < 0)
+  if (argc > 1)
+  {
+    filename = argv[1];
+  }
+  else
+  {
+    filename = "/proc/ropdetect";
+  }
+
+  if ((fp = open(filename, O_RDONLY)) < 0)
   {
     perror("open");
     return -1;

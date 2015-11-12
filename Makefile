@@ -19,6 +19,6 @@ else
 
 $(info Building with KERNELRELEASE = ${KERNELRELEASE})
 obj-m :=    ropdetect.o
-CFLAGS_ropdetect.o := -std=gnu99
+CFLAGS_ropdetect.o := -std=gnu99 -DEXCLUSIVE_CPU_ACCESS
 
 endif

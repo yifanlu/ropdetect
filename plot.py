@@ -63,18 +63,24 @@ else:
   filename = "/proc/ropdetect"
 
 prev_cycles = 0
-prev_events = [0]*MAX_EVENT_COUNTERS
+prev_events = None
 time = 0
+first = 0
 with open(filename, "rb") as f:
-  raw = f.read(12+4*MAX_EVENT_COUNTERS)
-  data = struct.unpack('iII%dI' % MAX_EVENT_COUNTERS, raw)
-  reset, cycles, num_counters, events = data[0], data[1], data[2], data[3:]
-  if reset == 1:
-    prev_cycles = 0
-    prev_events = [0]*num_counters
-  if cycles - prev_cycles >= TIME_DELTA:
-    time += cycles - prev_cycles
-    for i in range(len(streams)):
-      streams[i].write({'x': time, 'y': events[i] - prev_events[i]})
-    prev_events = events
-  prev_cycles = cycles
+  while True:
+    raw = f.read(12+4*MAX_EVENT_COUNTERS)
+    data = struct.unpack('iII%dI' % MAX_EVENT_COUNTERS, raw)
+    reset, cycles, num_counters, events = data[0], data[1], data[2], data[3:]
+    if reset == 1:
+      prev_cycles = 0
+      prev_events = [0]*num_counters
+    if first == 0:
+      prev_cycles = cycles
+      prev_events = events
+      first = 1
+    if cycles - prev_cycles >= TIME_DELTA:
+      time += cycles - prev_cycles
+      for i in range(len(streams)):
+        streams[i].write({'x': time, 'y': events[i] - prev_events[i]})
+      prev_events = events
+    prev_cycles = cycles
