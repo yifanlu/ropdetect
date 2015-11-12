@@ -4,7 +4,7 @@ import struct
 import sys
 
 MAX_EVENT_COUNTERS = 4
-TIME_DELTA = 100
+TIME_DELTA = 10000000
 
 username = 'yifanlu'
 api_key = '633y70mvms'
@@ -71,10 +71,7 @@ with open(filename, "rb") as f:
     raw = f.read(12+4*MAX_EVENT_COUNTERS)
     data = struct.unpack('iII%dI' % MAX_EVENT_COUNTERS, raw)
     reset, cycles, num_counters, events = data[0], data[1], data[2], data[3:]
-    if reset == 1:
-      prev_cycles = 0
-      prev_events = [0]*num_counters
-    if first == 0:
+    if first == 0 or reset == 1:
       prev_cycles = cycles
       prev_events = events
       first = 1
@@ -83,4 +80,4 @@ with open(filename, "rb") as f:
       for i in range(len(streams)):
         streams[i].write({'x': time, 'y': events[i] - prev_events[i]})
       prev_events = events
-    prev_cycles = cycles
+      prev_cycles = cycles
