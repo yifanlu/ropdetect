@@ -63,6 +63,8 @@ static struct resource *pmu_resource;
 static void *pmu_regs;
 static struct task_struct *monitor_task;
 
+static pmu_events_t counters;
+
 static int monitor_thread(void *data);
 
 static void get_current_debug_regs(void *info)
@@ -88,15 +90,6 @@ static void setup_events(void)
   iowrite32(ARMV7_PERFCTR_PC_IMM_BRANCH, pmu_regs+PMU_PMXEVTYPER3);
 }
 
-static inline void update_counts(int *cycles, int events[4])
-{
-  *cycles = ioread32(pmu_regs+PMU_PMCCNTR);
-  events[0] = ioread32(pmu_regs+PMU_PMXEVCNTR0);
-  events[1] = ioread32(pmu_regs+PMU_PMXEVCNTR1);
-  events[2] = ioread32(pmu_regs+PMU_PMXEVCNTR2);
-  events[3] = ioread32(pmu_regs+PMU_PMXEVCNTR3);
-}
-
 static int init_ropdetect(void)
 {
   phys_addr_t pmu_base;
@@ -120,14 +113,21 @@ static int init_ropdetect(void)
   {
     printk(KERN_ALERT "Failed to map PMU memory region 0x%08X\n", pmu_base);
   }
+  memset(counters, 0, sizeof(counters));
 
   pmcr = ioread32(pmu_regs+PMU_PMCR);
   // unlock regs
   iowrite32(0xC5ACCE55, pmu_regs+PMU_PMLAR);
-  printk(KERN_DEBUG "Found %d event counters\n", (pmcr >> 11) & 0x1F);
-  if (((pmcr >> 11) & 0x1F) < 4)
+  counters.num_counters = (pmcr >> 11) & 0x1F;
+  printk(KERN_DEBUG "Found %d event counters\n", counters.num_counters);
+  if (counters.num_counters < 4)
   {
     printk(KERN_WARNING "Not enough event counters! Results will be flawed.\n");
+  }
+  else if (counters.num_counters >= MAX_EVENT_COUNTERS)
+  {
+    printk(KERN_ALERT "Too many event counter registers, max supported: %d\n", MAX_EVENT_COUNTERS);
+    return -1;
   }
   // clear events
   pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
@@ -152,6 +152,7 @@ static int init_ropdetect(void)
 static void cleanup_ropdetect(void)
 {
   // stop monitor thread
+  printk(KERN_DEBUG "Stopping monitor process\n");
   kthread_stop(monitor_task);
   // stop event collection
   iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
@@ -159,11 +160,19 @@ static void cleanup_ropdetect(void)
   iounmap(pmu_regs);
 }
 
+static inline void update_counts(void)
+{
+  int i;
+  counters.cycles = ioread32(pmu_regs+PMU_PMCCNTR);
+  for (i = 0; i < counters.num_counters; i++)
+  {
+    counters.events[i] = ioread32(pmu_regs+PMU_PMXEVCNTR0+4*i)
+  }
+}
+
 static int monitor_thread(void *data)
 {
   int cpu;
-  int cycles, last_cycles;
-  int counts[4], last_counts[4];
 
   cpu = get_cpu();
   if (cpu != CPU_MONITOR)
@@ -176,17 +185,15 @@ static int monitor_thread(void *data)
   // setup event collection
   setup_events();
 
-  cycles = 0;
   while (!kthread_should_stop())
   {
-    last_cycles = cycles;
-    memcpy(last_counts, counts, sizeof(counts));
-    update_counts(&cycles, counts);
-    if (cycles - last_cycles > 100000)
+    update_counts();
+    if (counters.cycles % 1000 == 0)
     {
-      printk(KERN_DEBUG "0x%08X 0x%08X 0x%08X 0x%08X\n", counts[0]-last_counts[0], counts[1]-last_counts[1], counts[2]-last_counts[2], counts[3]-last_counts[3]);
+      printk(KERN_DEBUG "Cycles: %d, event: %d\n", counters.cycles, counters.events[0]);
     }
   }
+  printk(KERN_DEBUG "Monitor process stopped.\n");
 
   put_cpu();
   return 0;
