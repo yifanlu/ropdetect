@@ -113,6 +113,7 @@ static int init_ropdetect(void)
   if ((pmu_regs = ioremap_nocache(pmu_base, PMU_REGS_SIZE)) == NULL)
   {
     printk(KERN_ALERT "Failed to map PMU memory region 0x%08X\n", pmu_base);
+    goto error_alloc;
   }
   memset(&counters, 0, sizeof(counters));
 
@@ -128,7 +129,7 @@ static int init_ropdetect(void)
   else if (counters.num_counters >= MAX_EVENT_COUNTERS)
   {
     printk(KERN_ALERT "Too many event counter registers, max supported: %d\n", MAX_EVENT_COUNTERS);
-    return -1;
+    goto error;
   }
   // clear events
   pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
@@ -142,12 +143,18 @@ static int init_ropdetect(void)
   if (monitor_task == NULL)
   {
     printk(KERN_ALERT "Failed to create monitor thread\n");
-    return -1;
+    goto error;
   }
   kthread_bind(monitor_task, CPU_MONITOR);
   wake_up_process(monitor_task);
 
   return 0;
+error:
+  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
+  iounmap(pmu_regs);
+error_alloc:
+  release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
+  return -1;
 }
 
 static void cleanup_ropdetect(void)
