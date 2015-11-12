@@ -12,7 +12,7 @@ py.sign_in(username, api_key)
 
 stream_tokens = ['ho6zz8huxr', '96km39iab4', 'rlsnj0bro3', 'ion1mxk3ub']
 traces = [None]*4
-trace[0] = Scatter(
+traces[0] = Scatter(
     name = 'icache refill', 
     x=[],
     y=[],
@@ -21,7 +21,7 @@ trace[0] = Scatter(
         maxpoints=100
     )
 )
-trace[1] = Scatter(
+traces[1] = Scatter(
     name = 'tlb refill', 
     x=[],
     y=[],
@@ -30,7 +30,7 @@ trace[1] = Scatter(
         maxpoints=100
     )
 )
-trace[2] = Scatter(
+traces[2] = Scatter(
     name = 'branch mispredict', 
     x=[],
     y=[],
@@ -39,7 +39,7 @@ trace[2] = Scatter(
         maxpoints=100
     )
 )
-trace[3] = Scatter(
+traces[3] = Scatter(
     name = 'branch taken', 
     x=[],
     y=[],
@@ -51,7 +51,7 @@ trace[3] = Scatter(
 layout = Layout(
     title='ARM Cortex A7 PMU (Core 0)'
 )
-fig = Figure(data=trace, layout=layout)
+fig = Figure(data=traces, layout=layout)
 print py.plot(fig, filename='RPI Ropdetect Core 0')
 streams = [py.Stream(stream_tokens[i]) for i in range(len(stream_tokens))]
 for stream in streams:
