@@ -5,6 +5,7 @@
 #include <linux/proc_fs.h>
 #include <linux/kthread.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 #include <linux/smp.h>
 #include "ropdetect.h"
 
@@ -69,11 +70,11 @@ static pmu_events_t counters;
 static int num_counters;
 
 static int monitor_thread(void *data);
-static int ropdetect_proc(char *buffer, char **start, off_t offset, int size, int *eof, void *data);
+static int ropdetect_proc_read(struct file *filp, char *buf, size_t count, loff_t *offp);
 
 static const struct file_operations proc_fops = {
   .owner = THIS_MODULE,
-  .read: ropdetect_proc
+  .read = ropdetect_proc_read
 };
 
 static void get_current_debug_regs(void *info)
@@ -259,14 +260,17 @@ static int monitor_thread(void *data)
   return 0;
 }
 
-static int ropdetect_proc(char *buffer, char **start, off_t offset, int size, int *eof, void *data)
+static int ropdetect_proc_read(struct file *filp, char *buf, size_t count, loff_t *offp)
 {
-  if (size < sizeof(counters))
+  if (count < sizeof(counters))
   {
     return -EINVAL;
   }
 
-  memcpy(buffer, &counters, sizeof(counters));
+  if (copy_to_user(buf, &counters, sizeof(counters)) != 0)
+  {
+    return -EACCES;
+  }
   counters.reset = 0;
 
   return sizeof(counters);
