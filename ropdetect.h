@@ -5,6 +5,7 @@
 
 struct pmu_events
 {
+    int reset;
     unsigned int cycles;
     unsigned int num_counters;
     unsigned int events[MAX_EVENT_COUNTERS];

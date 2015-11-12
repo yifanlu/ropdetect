@@ -2,6 +2,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/proc_fs.h>
 #include <linux/kthread.h>
 #include <asm/io.h>
 #include <linux/smp.h>
@@ -65,8 +66,10 @@ static void *pmu_regs;
 static struct task_struct *monitor_task;
 
 static pmu_events_t counters;
+static int num_counters;
 
 static int monitor_thread(void *data);
+static int ropdetect_proc(char *buffer, char **start, off_t offset, int size, int *eof, void *data);
 
 static void get_current_debug_regs(void *info)
 {
@@ -81,14 +84,6 @@ static void get_current_debug_regs(void *info)
       "bic %0,#7\t\n" : "=r" (base) :: "memory"
     );
   *(phys_addr_t *)info = base;
-}
-
-static void setup_events(void)
-{
-  iowrite32(ARMV7_PERFCTR_IFETCH_MISS, pmu_regs+PMU_PMXEVTYPER0);
-  iowrite32(ARMV7_PERFCTR_ITLB_MISS, pmu_regs+PMU_PMXEVTYPER1);
-  iowrite32(ARMV7_PERFCTR_PC_BRANCH_MIS_PRED, pmu_regs+PMU_PMXEVTYPER2);
-  iowrite32(ARMV7_PERFCTR_PC_IMM_BRANCH, pmu_regs+PMU_PMXEVTYPER3);
 }
 
 static int init_ropdetect(void)
@@ -115,28 +110,28 @@ static int init_ropdetect(void)
     printk(KERN_ALERT "Failed to map PMU memory region 0x%08X\n", pmu_base);
     goto error_alloc;
   }
-  memset(&counters, 0, sizeof(counters));
 
   pmcr = ioread32(pmu_regs+PMU_PMCR);
   // unlock regs
   iowrite32(0xC5ACCE55, pmu_regs+PMU_PMLAR);
-  counters.num_counters = (pmcr >> 11) & 0x1F;
-  printk(KERN_DEBUG "Found %d event counters\n", counters.num_counters);
-  if (counters.num_counters < 4)
+  num_counters = (pmcr >> 11) & 0x1F;
+  printk(KERN_DEBUG "Found %d event counters\n", num_counters);
+  if (num_counters < 4)
   {
     printk(KERN_WARNING "Not enough event counters! Results will be flawed.\n");
   }
-  else if (counters.num_counters > MAX_EVENT_COUNTERS)
+  else if (num_counters > MAX_EVENT_COUNTERS)
   {
     printk(KERN_ALERT "Too many event counter registers, max supported: %d\n", MAX_EVENT_COUNTERS);
     goto error;
   }
-  // clear events
-  pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
-  iowrite32(pmcr, pmu_regs+PMU_PMCR);
-  // clear overflow
-  iowrite32(0xFFFFFFFF, pmu_regs+PMU_PMOVSR);
-  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENSET);
+
+  // create proc entry
+  if (create_proc_read_entry("ropdetect", 0, NULL, ropdetect_proc, NULL) == 0)
+  {
+    printk(KERN_ALERT "Cannot create `ropdetect` proc entry\n");
+    goto error;
+  }
 
   // create monitor thread
   monitor_task = kthread_create(monitor_thread, NULL, "ropdetect_monitor");
@@ -162,6 +157,54 @@ static void cleanup_ropdetect(void)
   kthread_stop(monitor_task);
   release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
   iounmap(pmu_regs);
+  remove_proc_entry("ropdetect", NULL);
+}
+
+static void setup_events(void)
+{
+  int pmcr;
+
+  // setup pmu
+  pmcr = ioread32(pmu_regs+PMU_PMCR);
+  pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
+  iowrite32(pmcr, pmu_regs+PMU_PMCR);
+
+  iowrite32(ARMV7_PERFCTR_IFETCH_MISS, pmu_regs+PMU_PMXEVTYPER0);
+  iowrite32(ARMV7_PERFCTR_ITLB_MISS, pmu_regs+PMU_PMXEVTYPER1);
+  iowrite32(ARMV7_PERFCTR_PC_BRANCH_MIS_PRED, pmu_regs+PMU_PMXEVTYPER2);
+  iowrite32(ARMV7_PERFCTR_PC_IMM_BRANCH, pmu_regs+PMU_PMXEVTYPER3);
+
+  // start collection
+  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENSET);
+}
+
+static void cleanup_events(void)
+{
+  int pmcr;
+
+  // stop collection
+  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
+  // disable counts
+  pmcr = ioread32(pmu_regs+PMU_PMCR);
+  pmcr = pmcr & ~1;
+  iowrite32(pmcr, pmu_regs+PMU_PMCR);
+}
+
+static inline void reset_counts(void)
+{
+  int pmcr;
+
+  // reset counts
+  pmcr = ioread32(pmu_regs+PMU_PMCR);
+  pmcr |= 0x27; // DP=1, X=0, D=0, C=1, P=1, E=1
+  iowrite32(pmcr, pmu_regs+PMU_PMCR);
+
+  // clear overflow
+  iowrite32(0xFFFFFFFF, pmu_regs+PMU_PMOVSR);
+
+  memset(&counters, 0, sizeof(counters));
+  counters.num_counters = num_counters;
+  counters.reset = 1;
 }
 
 static inline void update_counts(void)
@@ -185,22 +228,43 @@ static int monitor_thread(void *data)
     put_cpu();
     return -1;
   }
+#ifndef EXCLUSIVE_CPU_ACCESS
+  put_cpu();
+#endif
 
   // setup event collection
   setup_events();
+  reset_counts();
 
   while (!kthread_should_stop())
   {
     update_counts();
-    if (counters.cycles % 100000 == 0)
+    if (ioread32(pmu_regs+PMU_PMOVSR) != 0)
     {
-      printk(KERN_DEBUG "Cycles: %d, event: %d\n", counters.cycles, counters.events[0]);
+      // overflow
+      reset_counts();
     }
   }
-  printk(KERN_DEBUG "Monitor process stopped.\n");
+  printk(KERN_DEBUG "Monitor process stopping.\n");
+  cleanup_events();
 
+#ifdef EXCLUSIVE_CPU_ACCESS
   put_cpu();
+#endif
   return 0;
+}
+
+static int ropdetect_proc(char *buffer, char **start, off_t offset, int size, int *eof, void *data)
+{
+  if (size < sizeof(counters))
+  {
+    return -EINVAL;
+  }
+
+  memcpy(buffer, &counters, sizeof(counters));
+  counters.reset = 0;
+
+  return sizeof(counters);
 }
 
 module_init(init_ropdetect);
