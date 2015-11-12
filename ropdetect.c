@@ -158,11 +158,8 @@ error_alloc:
 
 static void cleanup_ropdetect(void)
 {
-  // stop monitor thread
   printk(KERN_DEBUG "Stopping monitor process\n");
   kthread_stop(monitor_task);
-  // stop event collection
-  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
   release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
   iounmap(pmu_regs);
 }
@@ -195,7 +192,7 @@ static int monitor_thread(void *data)
   while (!kthread_should_stop())
   {
     update_counts();
-    if (counters.cycles % 1000 == 0)
+    if (counters.cycles % 100000 == 0)
     {
       printk(KERN_DEBUG "Cycles: %d, event: %d\n", counters.cycles, counters.events[0]);
     }
