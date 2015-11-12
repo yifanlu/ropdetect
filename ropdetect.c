@@ -71,6 +71,11 @@ static int num_counters;
 static int monitor_thread(void *data);
 static int ropdetect_proc(char *buffer, char **start, off_t offset, int size, int *eof, void *data);
 
+static const struct file_operations proc_fops = {
+  .owner = THIS_MODULE,
+  .read: ropdetect_proc
+};
+
 static void get_current_debug_regs(void *info)
 {
   phys_addr_t base;
@@ -127,7 +132,7 @@ static int init_ropdetect(void)
   }
 
   // create proc entry
-  if (create_proc_read_entry("ropdetect", 0, NULL, ropdetect_proc, NULL) == 0)
+  if (proc_create("ropdetect", 0, NULL, &proc_fops) == 0)
   {
     printk(KERN_ALERT "Cannot create `ropdetect` proc entry\n");
     goto error;
