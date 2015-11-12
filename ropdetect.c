@@ -126,7 +126,7 @@ static int init_ropdetect(void)
   {
     printk(KERN_WARNING "Not enough event counters! Results will be flawed.\n");
   }
-  else if (counters.num_counters >= MAX_EVENT_COUNTERS)
+  else if (counters.num_counters > MAX_EVENT_COUNTERS)
   {
     printk(KERN_ALERT "Too many event counter registers, max supported: %d\n", MAX_EVENT_COUNTERS);
     goto error;
@@ -150,7 +150,6 @@ static int init_ropdetect(void)
 
   return 0;
 error:
-  iowrite32(0x8000000F, pmu_regs+PMU_PMCNTENCLR);
   iounmap(pmu_regs);
 error_alloc:
   release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
