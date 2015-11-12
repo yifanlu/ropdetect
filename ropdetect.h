@@ -1,4 +1,4 @@
-#ifdef ROPDETECT_H
+#ifndef ROPDETECT_H
 #define ROPDETECT_H
 
 #define MAX_EVENT_COUNTERS 4

@@ -5,6 +5,7 @@
 #include <linux/kthread.h>
 #include <asm/io.h>
 #include <linux/smp.h>
+#include "ropdetect.h"
 
 #define DRIVER_AUTHOR "Yifan Lu <yifanlu@stanford.edu>"
 #define DRIVER_DESC   "ROP detection through pref monitor"
@@ -113,7 +114,7 @@ static int init_ropdetect(void)
   {
     printk(KERN_ALERT "Failed to map PMU memory region 0x%08X\n", pmu_base);
   }
-  memset(counters, 0, sizeof(counters));
+  memset(&counters, 0, sizeof(counters));
 
   pmcr = ioread32(pmu_regs+PMU_PMCR);
   // unlock regs
@@ -166,7 +167,7 @@ static inline void update_counts(void)
   counters.cycles = ioread32(pmu_regs+PMU_PMCCNTR);
   for (i = 0; i < counters.num_counters; i++)
   {
-    counters.events[i] = ioread32(pmu_regs+PMU_PMXEVCNTR0+4*i)
+    counters.events[i] = ioread32(pmu_regs+PMU_PMXEVCNTR0+4*i);
   }
 }
 
