@@ -250,7 +250,7 @@ static inline void update_counts(void)
   write_idx = (write_idx + 1) % CACHE_BUFFER_SIZE;
   if (read_idx == write_idx) // push read ahead
   {
-    read_idx = (read_idx + 1) & CACHE_BUFFER_SIZE;
+    read_idx = (write_idx + 1) % CACHE_BUFFER_SIZE;
   }
 }
 
@@ -259,7 +259,7 @@ static inline void get_counts(pmu_events_t *counter)
   *counter = buffer[read_idx];
   if (read_idx != write_idx-1)
   {
-    read_idx = (read_idx + 1) & CACHE_BUFFER_SIZE;
+    read_idx = (read_idx + 1) % CACHE_BUFFER_SIZE;
   }
 }
 
@@ -296,6 +296,7 @@ static int monitor_thread(void *data)
       // overflow
       reset_counts();
     }
+    prev_cycles = cycles;
   }
   printk(KERN_DEBUG "Monitor process stopping.\n");
   cleanup_events();
@@ -320,7 +321,6 @@ static int ropdetect_proc_read(struct file *filp, char *buf, size_t count, loff_
   {
     return -EACCES;
   }
-  counters.reset = 0;
 
   return sizeof(counters);
 }
