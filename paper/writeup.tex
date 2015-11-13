@@ -1,0 +1,275 @@
+% TEMPLATE for Usenix papers, specifically to meet requirements of
+%  USENIX '05
+% originally a template for producing IEEE-format articles using LaTeX.
+%   written by Matthew Ward, CS Department, Worcester Polytechnic Institute.
+% adapted by David Beazley for his excellent SWIG paper in Proceedings,
+%   Tcl 96
+% turned into a smartass generic template by De Clarke, with thanks to
+%   both the above pioneers
+% use at your own risk.  Complaints to /dev/null.
+% make it two column with no page numbering, default is 10 point
+
+% Munged by Fred Douglis <douglis@research.att.com> 10/97 to separate
+% the .sty file from the LaTeX source template, so that people can
+% more easily include the .sty file into an existing document.  Also
+% changed to more closely follow the style guidelines as represented
+% by the Word sample file. 
+
+% Note that since 2010, USENIX does not require endnotes. If you want
+% foot of page notes, don't include the endnotes package in the 
+% usepackage command, below.
+
+\documentclass[letterpaper,twocolumn,10pt]{article}
+\usepackage{usenix,epsfig,endnotes,amsmath,amssymb}
+\begin{document}
+
+%don't want date printed
+\date{}
+
+%make title bold and 14 pt font (Latex default is non-bold, 16 pt)
+\title{\Large \bf ROPDetect : Online Detection of Code Reuse Attacks}
+
+\author{
+{\rm Yifan Lu}\\
+Stanford University
+\and
+{\rm Christopher Hansen}\\
+Stanford University
+}
+
+\maketitle
+
+% Use the following at camera-ready time to suppress page numbers.
+% Comment it out when you first submit the paper for review.
+\thispagestyle{empty}
+
+
+\subsection*{Abstract}
+
+Advances in software security has made vulnerability exploitation more difficult. The most common 
+attack against modern defenses is return-orientated-programming (ROP), which leverages existing code in 
+memory to redirect execution for malicious means. We built a classifier that can differentiate 
+between normal execution and ROP execution by using the performance monitors built into the ARM Cortex A7
+processor. The monitors gives fine grained access to architectural events, which allows us to 
+detect execution anomalies caused by ROP. Detecting ROP execution allows the supervisor to terminate 
+the compromised process before code execution is achieved by the malware, preventing the attack 
+from succeeding.
+
+\section{Introduction}
+
+Software exploitation, as used by malware and other kinds of attacks, require the attacker to 
+take control of code execution. Historically, this involves injecting code into memory and 
+using a software vulnerability to execute it. This works because both ARM and x86 uses a 
+modified Harvard architecture which allows code and data memory to be shared.
+
+ARMv6 introduced the ``execute never''\cite{ARMv6} feature and Intel introduced the ``execute disable'' 
+feature with their ``Prescott'' processors\cite{HP}. Both of these implementations ensure that 
+memory pages are never mapped as both writable and executable (unless specified explicitly by the OS). 
+This mitigates code 
+injection attacks that relies on redirecting execution to attacker-controlled code stored 
+in data memory. In response to this, attackers rely on ``code reuse'' or 
+``return orientated programming'' (ROP). 
+
+The idea behind ROP is that the attacker cannot map her own code into the target's 
+executable memory, but she can ``reuse'' the code already in executable memory as 
+well as control the target's program stack (through some vulnerability). The 
+program stack is typically used to store (along with other data), return pointers 
+when a function call is made. The return pointer allows the program to resume 
+execution at the caller after a function call returns. When the attacker overwrites 
+the return pointer, she can redirect control flow to anywhere in executable 
+memory. If the attacker finds useful ``gadgets'', or instructions that perform a 
+single useful operation (such as a memory load or store) and then jumps to the 
+next return pointer in the stack, she can inject a large number of return 
+pointers into the stack and control execution that way.
+
+Even though ROP attacks are very powerful\cite{unk}, most attackers only use it 
+as the first stage of a multi-stage attack where ROP is used to bypass operating 
+system restrictions in order to escalate control of the compromised process to 
+control of the entire system. If we can differentiate ROP execution with normal 
+code execution, then we can terminate a process before the control is escalated 
+and stop the attack. Heuristically, we can see that ROP execution is different 
+because it uses a large number of ``return'' instructions while normal (optimized) 
+code does not perform as many returns in the same sort period of time. Additionally, 
+in normal code, ``return'' 
+instructions are often matched with ``call'' instructions. Finally, processors optimized 
+to run normal code will likely perform better with normal execution than ROP 
+execution (which for example, makes branch prediction hard). However, even in 
+normal execution, there are situations such as tail recursion in a tight function 
+that may make classification using just heuristics difficult. We choose to 
+implement unsupervised machine learning to solve the classification problem.
+
+\section{Background}
+
+\subsection*{Previous Works}
+
+A large inspiration for this comes from Demme \textit{et al.}, 
+who talked about the usage of data from CPU performance counters as features for 
+anomaly detection\cite{Demme:2013:FOM:2508148.2485970}. Teng \textit{et al.} provided 
+an implementation on x86 machines for detecting malware\cite{DBLP:journals/corr/TangSS14}. In their implementation, 
+they ``[sampled at a] rate of every 512,000 instructions since it provides a reasonable amount of measurements without incurring too much overhead.'' This meant that their model ``does not perform well in the detection of the ROP shellcode, likely because the sampling granularity at 512k instructions is too large to capture the deviations in the baseline models.''
+
+Our implementation differs mainly in two ways. First, we sample at a much higher rate of 1,000 
+instructions. This is possible because we take advantage of the multi-processor 
+implementation of ARM Cortex A7, and we can use a separate core to perform the measurements 
+and not have to pay the overhead of interrupts required by measuring on the same processor core. 
+Second, we focus on ARM architecture rather than x86. We believe that the RISC model 
+implemented by ARM results in less noise in measurements.
+
+\subsection*{Performance Counters}
+
+ARMv7 architecture defines a series of system debug registers for performance monitoring\cite{ARMv7}. 
+These registers (referred to henceforth as PMU registers) can be enabled to be accessible by other processors in the system. Once set-up, 
+the system can be set to monitor cycle counts as well as a number of architecture events\endnote{Our ARM Cortex A7 supports collecting up to four events}. Because these registers 
+are required by the architecture\endnote{We actually found a CPU bug in the Broadcom BCM2836 (ARM Cortex A7) device. The \textsc{DBGDSAR} register was implemented incorrectly, storing an absolute address instead of an offset. This is indication that debug registers may not verified as strenuously as the rest of the system.}, our detection method can be implemented in any ARMv7 (and 
+later) SMP device (this includes most modern smart devices).
+
+\section{Setup}
+
+We choose to perform our tests on a Raspberry Pi 2, which runs a Broadcom implemented ARM Cortex A7 processor 
+system\cite{RPI}. This is because the Raspberry Pi 2 runs a popular Linux distribution (Raspbian) which 
+provides support for many packages that we wish to run test with.
+
+\subsection*{Data Collection}
+
+In our multi-core system, we arbitrary assign one core to be the ``target'' and one core to be the ``monitor''. 
+The monitor collects events from the PMU registers owned by the target core. In order 
+to minimize error caused by interrupts on the monitor core, we claim exclusive access on the monitor core 
+such that no other process runs on that core. Similarly, to avoid having to collect data on the remaining 
+cores, we ensure that all other processes run on the target core. Even though the system is multi-core, we 
+only model a single-core system. Although this is limiting, we discuss in section ?? how we can relax 
+these requirements and allow our setup to work in a multi-core system.
+
+Because, by default, the PMU registers are only accessible by the supervisor and because 
+we wish to disable interrupts on the monitor core, we choose to implement the data source as a 
+custom Linux module. Our module takes, as parameters, the ids for the events we wish to collect. It then 
+locates the PMU registers from the target core and maps it into memory accessible by the 
+monitor core. After setting up the PMU to collect the events we want, it spawns a monitor 
+thread that claims exclusive access on the monitor core. This thread reads the PMU registers 
+at the sample rate into a circular buffer. Our Linux module also exports a \texttt{/proc} entry 
+that allows reading of this buffer. Our implementation uses this virtual file to process the data.
+
+In the current implementation, we process the data with a Python process running on a core 
+separate from both the target and the monitor. This is because we want minimal interference 
+of the actual data processing from both the data collection and the data generation. In 
+section ??, we provide reasons that relaxing this requirement will not hurt the results.
+
+\subsection*{Kernel Events Filtering}
+
+(To be determined if we want to implement this. The idea is to take kernel events such 
+as context switches and current running PID in order to group and filter the data.)
+
+\subsection*{Event Selection}
+
+Although the architecture manual\cite{ARMv7} defines support of up to 31 simultaneous event 
+counters, our ARM Cortex A7 device only has 4 implemented. A possible way of collecting 
+more events is to let the monitor change the PMU settings every $M$ cycles for $K$ groups of 4 events where 
+$M K < N$, our sample rate. We can then run a feature selection algorithm on the dataset. However, we choose to avoid the complications and 
+throw out from consideration certain events. (We may do this if we have time but for now...)
+
+Figure \ref{fig:events} shows the list of events we threw out from consideration. We choose to 
+ignore any data memory driven events because any kind of execution (normal or ROP) must interact 
+with data and therefore, there is unlikely to be correlation between ROP execution and data 
+accesses. We choose to ignore ``rare'' events such as event \texttt{0x00} and \texttt{0x0B} 
+because they require OS implementation (and Linux does not implement those events). We also 
+ignore ``common'' events such as \texttt{0x08} because they are unlikely to yield information 
+about the current state of the processor. Most of the events we include are driven by 
+instruction execution. This still leaves us with 7 events to consider. We describe 
+in section ?? our method of feature selection from the remaining events.
+
+\begin{figure}
+\begin{center}
+\begin{tabular}{ |c|c|c| } 
+\hline
+ID & Description & Included \\
+\hline
+\texttt{0x00} & Software increment & No \\ 
+\texttt{0x01} & ICache refill & Yes \\ 
+\texttt{0x02} & TLB refill (caused by ifetch) & Yes \\ 
+\texttt{0x03} & DCache refill & No \\ 
+\texttt{0x04} & DCache access & No \\ 
+\texttt{0x05} & TLB refill (cacued by dfetch) & No \\ 
+\texttt{0x06} & Data read & No \\ 
+\texttt{0x07} & Data write & No \\ 
+\texttt{0x08} & Instruction executed & No \\ 
+\texttt{0x09} & Exception taken & No \\ 
+\texttt{0x0A} & Exception return & No \\ 
+\texttt{0x0B} & CONTEXTIDR write & No \\ 
+\texttt{0x0C} & PC changed manually & Yes \\ 
+\texttt{0x0D} & Branch taken & Yes \\ 
+\texttt{0x0E} & Return taken & Yes \\ 
+\texttt{0x0F} & Unaligned data access & No \\ 
+\texttt{0x10} & Branch mis-predicted & Yes \\ 
+\texttt{0x11} & Cycle count & No \\ 
+\texttt{0x12} & Branch predicted & Yes \\ 
+\hline
+\end{tabular}
+\end{center}
+\caption{PMU events considered}
+\label{fig:events}
+\end{figure}
+
+\subsection*{Sample Rate}
+
+It is important that we sample at a good rate. If we sample too frequently, we may not process 
+the data fast enough for our decision to aid the system in terminating a compromised process. 
+Additionally, a high sample rate consumes too much resources and may not scale. However, if 
+we sample too slowly, we may not take advantage of temporal features in our classification.
+
+We measured that the number of cycles it takes to execute ROP payloads from our samples 
+is ?? and therefore, we set our sampling frequency to be ??.
+
+(Right now, we use a rate of 1,000 cycles with no justification.)
+
+\subsection*{Malware Samples}
+
+We (will) use the Metasploit framework to test exploits on popular applications. We only 
+consider payloads that contain a ROP stage.
+
+\section{Model}
+
+Motivated by Teng \textit{et al.}, we use a one-class Support Vector Machine (oc-SVM) 
+classifier that uses the non-linear Radial Basis Function (RBF) kernel\cite{DBLP:journals/corr/TangSS14}.
+
+(For the future, we want to try other algorithms and see if we can get better results.) 
+
+\subsection*{Features}
+
+We first define our non-temporal features to be a 4-dimensional vector defined 
+by the number of each of the four events we sample.
+
+There are also temporal information we wish to consider. As a motivating example, 
+consider that a normal execution has the following properties: a spike in the number 
+of function call leads to a spike of return calls after some cycles. In a ROP execution, 
+we have a spike of return calls without the preceding function call spike. Therefore, 
+it would be useful to consider the concatenation of $N$ vectors from $N$ time-slices 
+such that we have a 4$N$-dimensional vector.
+
+\subsection*{Feature Selection}
+
+(For future work, we need to perform feature selection both on which 4 events 
+to consider and also on $N$)
+
+\subsection*{Training}
+
+Our training data comes from both normal use cases and also ROP payloads from Metasploit.
+
+\section{Results}
+
+\section{Future Work}
+
+\section{Conclusion}
+
+{\footnotesize \bibliographystyle{acm}
+\bibliography{writeup}}
+
+
+\theendnotes
+
+\end{document}
+
+
+
+
+
+
+
