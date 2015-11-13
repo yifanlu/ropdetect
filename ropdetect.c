@@ -76,7 +76,7 @@ MODULE_PARM_DESC(collect_ids, "Array of event ids to collect");
 
 // default collection frequency
 static int collect_period = 1000;
-module_param_int(collect_period, int, 0);
+module_param(collect_period, int, 0);
 MODULE_PARM_DESC(collect_period, "Number of cycles per sampling");
 
 static phys_addr_t pmu_phys_base;

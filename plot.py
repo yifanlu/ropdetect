@@ -13,7 +13,7 @@ py.sign_in(username, api_key)
 stream_tokens = ['ho6zz8huxr', '96km39iab4', 'rlsnj0bro3', 'ion1mxk3ub']
 traces = [None]*4
 traces[0] = Scatter(
-    name = 'icache refill', 
+    name = 'icache fetch', 
     x=[],
     y=[],
     stream=dict(
@@ -22,7 +22,7 @@ traces[0] = Scatter(
     )
 )
 traces[1] = Scatter(
-    name = 'tlb refill', 
+    name = 'branch taken', 
     x=[],
     y=[],
     stream=dict(
@@ -31,7 +31,7 @@ traces[1] = Scatter(
     )
 )
 traces[2] = Scatter(
-    name = 'branch mispredict', 
+    name = 'return taken', 
     x=[],
     y=[],
     stream=dict(
@@ -40,7 +40,7 @@ traces[2] = Scatter(
     )
 )
 traces[3] = Scatter(
-    name = 'branch taken', 
+    name = 'branch mispredict', 
     x=[],
     y=[],
     stream=dict(
