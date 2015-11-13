@@ -14,6 +14,8 @@
 
 #define CPU_TARGET 0
 #define CPU_MONITOR 1
+#define CACHE_BUFFER_SIZE 0x10000
+
 #define PMU_REGS_OFFSET 0x1000
 #define PMU_REGS_SIZE 0x1000
 
@@ -72,12 +74,19 @@ static int collect_ids[MAX_EVENT_COUNTERS] = {
 module_param_array(collect_ids, int, NULL, 0);
 MODULE_PARM_DESC(collect_ids, "Array of event ids to collect");
 
+// default collection frequency
+static int collect_period = 1000;
+module_param_int(collect_period, int, 0);
+MODULE_PARM_DESC(collect_period, "Number of cycles per sampling");
+
 static phys_addr_t pmu_phys_base;
 static struct resource *pmu_resource;
 static void *pmu_regs;
 static struct task_struct *monitor_task;
 
-static pmu_events_t counters;
+static pmu_events_t buffer[CACHE_BUFFER_SIZE];
+static int read_idx;
+static int write_idx;
 static int num_counters;
 
 static int monitor_thread(void *data);
@@ -209,6 +218,7 @@ static void cleanup_events(void)
 static inline void reset_counts(void)
 {
   int pmcr;
+  pmu_events_t *counter;
 
   // reset counts
   pmcr = ioread32(pmu_regs+PMU_PMCR);
@@ -218,24 +228,45 @@ static inline void reset_counts(void)
   // clear overflow
   iowrite32(0xFFFFFFFF, pmu_regs+PMU_PMOVSR);
 
-  memset(&counters, 0, sizeof(counters));
-  counters.num_counters = num_counters;
-  counters.reset = 1;
+  counter = &buffer[write_idx];
+  memset(counter, 0, sizeof(*counter));
+  counter->reset = 1;
 }
 
+// the follow two functions are not thread safe, but we lose accuracy in exchange 
+// for speed
 static inline void update_counts(void)
 {
   int i;
-  counters.cycles = ioread32(pmu_regs+PMU_PMCCNTR);
-  for (i = 0; i < counters.num_counters; i++)
+  pmu_events_t *counter;
+
+  counter = &buffer[write_idx];
+  counter->cycles = ioread32(pmu_regs+PMU_PMCCNTR);
+  counter->num_counters = num_counters;
+  for (i = 0; i < num_counters; i++)
   {
-    counters.events[i] = ioread32(pmu_regs+PMU_PMXEVCNTR0+4*i);
+    counter->events[i] = ioread32(pmu_regs+PMU_PMXEVCNTR0+4*i);
+  }
+  write_idx = (write_idx + 1) % CACHE_BUFFER_SIZE;
+  if (read_idx == write_idx) // push read ahead
+  {
+    read_idx = (read_idx + 1) & CACHE_BUFFER_SIZE;
+  }
+}
+
+static inline void get_counts(pmu_events_t *counter)
+{
+  *counter = buffer[read_idx];
+  if (read_idx != write_idx-1)
+  {
+    read_idx = (read_idx + 1) & CACHE_BUFFER_SIZE;
   }
 }
 
 static int monitor_thread(void *data)
 {
   int cpu;
+  unsigned int cycles, prev_cycles;
 
   cpu = get_cpu();
   if (cpu != CPU_MONITOR)
@@ -252,9 +283,14 @@ static int monitor_thread(void *data)
   setup_events();
   reset_counts();
 
+  prev_cycles = 0;
   while (!kthread_should_stop())
   {
-    update_counts();
+    cycles = ioread32(pmu_regs+PMU_PMCCNTR);
+    if (cycles - prev_cycles >= collect_period)
+    {
+      update_counts();
+    }
     if (ioread32(pmu_regs+PMU_PMOVSR) != 0)
     {
       // overflow
@@ -272,11 +308,14 @@ static int monitor_thread(void *data)
 
 static int ropdetect_proc_read(struct file *filp, char *buf, size_t count, loff_t *offp)
 {
+  pmu_events_t counters;
+
   if (count < sizeof(counters))
   {
     return -EINVAL;
   }
 
+  get_counts(&counters);
   if (copy_to_user(buf, &counters, sizeof(counters)) != 0)
   {
     return -EACCES;
