@@ -13,8 +13,11 @@ user: ropdetect
 ropdetect: ropdetect_user.o
 	$(CC) $(LDFLAGS) -o $@ $?
 
+ropsimulate: ropsimulate.c
+	$(CC) -static -O0 -march=armv7-a -mthumb-interwork -mthumb -fno-pic -fno-pie -o $@ $?
+
 clean:
-	rm -rf ropdetect *.o *~ core .depend .*.cmd *.ko *.mod.c
+	rm -rf ropdetect ropsimulate *.o *~ core .depend .*.cmd *.ko *.mod.c
 else
 
 $(info Building with KERNELRELEASE = ${KERNELRELEASE})
