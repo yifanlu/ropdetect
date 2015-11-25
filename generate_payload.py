@@ -6,7 +6,9 @@ import argparse
 import random
 import struct
 
-WEIGHT_MEMOP = 0.75
+# TODO: Add support for JOP
+# TODO: Add support for making function calls
+
 MAX_SCRATCH_SIZE = 1024
 BLACKLIST_OPS = (
   ARM_INS_PUSH, ARM_INS_POP, ARM_INS_LDMDA, ARM_INS_LDMDB, 
@@ -129,6 +131,7 @@ def main():
   parser.add_argument('-s', '--seed', type=str, help='Random seed.')
   parser.add_argument('-e', '--end', type=str, metavar="<hexaddr>", default=0, help='Address of final gadget in payload.')
   parser.add_argument('-n', '--size', type=int, metavar="<number>", default=4096, help='Minimum size of payload in bytes')
+  parser.add_argument('-w', '--memweight', type=int, metavar="0-99", default=75, choices=range(100), help='Weight of memory access gadgets (0-99). Default is 75, 0 if scratch buffer not specified.')
   parser.add_argument('-m', '--scratch', type=str, metavar="<hexaddr>", default='0', help='Address of scratch space for memory gadgets. No memory gadgets will be used without this argument.')
   parser.add_argument('input', type=str, help='Input ELF executable')
   parser.add_argument('output', type=argparse.FileType('wb'), help='Output ROP payload')
@@ -140,7 +143,7 @@ def main():
   scratch = int(args.scratch, 16)
   generate = ROPGenerate(ropg)
   while i < args.size/4:
-    if scratch > 0 and random.random() < WEIGHT_MEMOP:
+    if scratch > 0 and random.randrange(100) < args.memweight:
       i += generate.get_random_mem_chain(scratch, args.output)
     else:
       i += generate.get_random_chain(args.output)
