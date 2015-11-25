@@ -245,7 +245,7 @@ static int parse_args(int argc, const char *argv[], FILE **fp, int *type)
                 {
                     fprintf(stderr, "Scratch Buffer: 0x%08X\n", scratch_space);
                     fprintf(stderr, "Scratch Size: %d\n", ROP_SCRATCH_SPACE);
-                    fprintf(stderr, "Flag Capture Function: %d\n", capture_flag);
+                    fprintf(stderr, "Flag Capture Function: 0x%08X\n", capture_flag);
                     return 1;
                 }
                 else
