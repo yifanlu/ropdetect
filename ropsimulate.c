@@ -5,7 +5,7 @@
 #include <string.h>
 #include <time.h>
 
-#define ROP_SCRATCH_SPACE 16
+#define ROP_SCRATCH_SPACE 1024
 #define DATA_BUFFER_SIZE 16777216 // 16*L2 size
 #define TYPE_DATA 0
 #define TYPE_BRANCH 1
@@ -196,10 +196,16 @@ static void sim_string_ops(int n, int trigger)
     }
 }
 
+void __attribute__((noreturn)) capture_flag(void)
+{
+    fprintf(stderr, "ROP payload ended.\n");
+    exit(0);
+}
+
 static void show_help(void)
 {
     fprintf(stderr, "usage: ropsimulate -t type [-r seed] [-p payload]\n");
-    fprintf(stderr, "           -t type    one of 'data', 'branch', 'mixed'\n");
+    fprintf(stderr, "           -t type    one of 'address', 'data', 'branch', 'mixed'\n");
     fprintf(stderr, "           -r seed    number used for seed\n");
     fprintf(stderr, "           -p payload file used as rop payload\n");
 }
@@ -234,6 +240,13 @@ static int parse_args(int argc, const char *argv[], FILE **fp, int *type)
                 else if (strcmp("mixed", argv[i+1]) == 0)
                 {
                     *type = TYPE_MIXED;
+                }
+                else if (strcmp("address", argv[i+1]) == 0)
+                {
+                    fprintf(stderr, "Scratch Buffer: 0x%08X\n", scratch_space);
+                    fprintf(stderr, "Scratch Size: %d\n", ROP_SCRATCH_SPACE);
+                    fprintf(stderr, "Flag Capture Function: %d\n", capture_flag);
+                    return 1;
                 }
                 else
                 {
