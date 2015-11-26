@@ -60,6 +60,10 @@ class ROPGenerate:
         invalid = False
         mygadget['gadget'] += '%s %s ; ' % (insn.mnemonic, insn.op_str) 
         for i in insn.operands:
+          if i.shift.type in (ARM_SFT_ASR_REG, ARM_SFT_LSL_REG, ARM_SFT_LSR_REG, ARM_SFT_ROR_REG, ARM_SFT_RRX_REG):
+            if i.shift.value == ARM_REG_PC:
+              invalid = True
+              break # illegal. not recognized as such by capstone
           if i.type == ARM_OP_MEM:
             if not first:
               invalid = True
@@ -73,10 +77,10 @@ class ROPGenerate:
           elif i.type == ARM_OP_REG:
             if i.reg == ARM_REG_SP or i.reg == ARM_REG_PC:
               touch_sp_pc = True
+            if mem_base_reg != ARM_REG_INVALID:
+              invalid = True
+              break # no support for register indexing
             regs += [i.reg]
-          elif i.shift.type in (ARM_SFT_ASR_REG, ARM_SFT_LSL_REG, ARM_SFT_LSR_REG, ARM_SFT_ROR_REG, ARM_SFT_RRX_REG):
-            invalid = True
-            break # possible illegal instructions with reg based shifts. (capstone does not recognize ror pc as invalid)
           else:
             invalid = True
             break # no support for these operands
