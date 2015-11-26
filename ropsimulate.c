@@ -54,7 +54,7 @@ static void sim_matrix_mul(unsigned int n, unsigned int trigger)
         }
         if ((i % 10) == 0)
         {
-            LOG("steps: %d", steps);
+            LOG("steps: %u", steps);
         }
     }
 }
@@ -117,16 +117,16 @@ static void sim_func_calls(unsigned int n, unsigned int trigger)
         {
             trigger_rop();
         }
-        if ((steps % 100) == 0)
+        if ((steps % 10000) == 0)
         {
-            LOG("steps: %d", steps);
+            LOG("steps: %u", steps);
         }
     }
 }
 
 // mixed branch/data load
 // this simulates many string operations
-static void sim_string_ops(int n, int trigger)
+static void sim_string_ops(unsigned int n, unsigned int trigger)
 {
     unsigned int i;
     char *s1, *s2;
@@ -189,9 +189,9 @@ static void sim_string_ops(int n, int trigger)
         {
             trigger_rop();
         }
-        if ((steps % 1000) == 0)
+        if ((steps % 10000) == 0)
         {
-            LOG("steps: %d", steps);
+            LOG("steps: %u", steps);
         }
     }
 }
@@ -335,7 +335,7 @@ int main(int argc, const char *argv[])
         }
         case TYPE_BRANCH:
         {
-            n = 100000000;
+            n = 10000000;
             trigger = rop_payload ? rand() % n : 0;
             fprintf(stderr, "Simulating branch intensive load...\n");
             if (trigger > 0)
@@ -347,7 +347,7 @@ int main(int argc, const char *argv[])
         }
         case TYPE_MIXED:
         {
-            n = 100000;
+            n = 1000000;
             trigger = rop_payload ? rand() % n*DATA_BUFFER_SIZE : 0;
             fprintf(stderr, "Simulating mixed load...\n");
             if (trigger > 0)
