@@ -29,11 +29,11 @@ static void __attribute__((naked,noreturn)) trigger_rop(void)
 
 // pure memory intensive load
 // this simulates matrix multiplication
-static void sim_matrix_mul(int n, int trigger)
+static void sim_matrix_mul(unsigned int n, unsigned int trigger)
 {
-    int i, j, k, sum;
-    register int steps;
-    register int _trigger;
+    unsigned int i, j, k, sum;
+    register unsigned int steps;
+    register unsigned int _trigger;
 
     _trigger = trigger;
     steps = 0;
@@ -99,11 +99,11 @@ static const func_t func_table[256] = {
 
 // pure branch intensive load
 // this simulates a lot of C++ vtable calls
-static void sim_func_calls(int n, int trigger)
+static void sim_func_calls(unsigned int n, unsigned int trigger)
 {
-    int i;
-    register int steps;
-    register int _trigger;
+    unsigned int i;
+    register unsigned int steps;
+    register unsigned int _trigger;
     unsigned char c;
 
     c = 0;
@@ -128,11 +128,11 @@ static void sim_func_calls(int n, int trigger)
 // this simulates many string operations
 static void sim_string_ops(int n, int trigger)
 {
-    int i;
+    unsigned int i;
     char *s1, *s2;
     size_t len, len1, len2;
-    register int steps;
-    register int _trigger;
+    register unsigned int steps;
+    register unsigned int _trigger;
 
     _trigger = trigger;
     random_data[DATA_BUFFER_SIZE-1] = '\0';
@@ -286,7 +286,7 @@ int main(int argc, const char *argv[])
     FILE *fp;
     int type;
     size_t len, pos, k;
-    int i, n, trigger;
+    unsigned int i, n, trigger;
 
     fp = NULL;
     if (parse_args(argc, argv, &fp, &type))
@@ -328,7 +328,7 @@ int main(int argc, const char *argv[])
             fprintf(stderr, "Simulating data intensive load...\n");
             if (trigger > 0)
             {
-                fprintf(stderr, "Triggering ROP at step %d of %d\n", trigger, n*n*n);
+                fprintf(stderr, "Triggering ROP at step %u of %u\n", trigger, n*n*n);
             }
             sim_matrix_mul(n, trigger);
             break;
@@ -340,7 +340,7 @@ int main(int argc, const char *argv[])
             fprintf(stderr, "Simulating branch intensive load...\n");
             if (trigger > 0)
             {
-                fprintf(stderr, "Triggering ROP at step %d of %d\n", trigger, n);
+                fprintf(stderr, "Triggering ROP at step %u of %u\n", trigger, n);
             }
             sim_func_calls(n, trigger);
             break;
@@ -352,7 +352,7 @@ int main(int argc, const char *argv[])
             fprintf(stderr, "Simulating mixed load...\n");
             if (trigger > 0)
             {
-                fprintf(stderr, "Triggering ROP at step %d of %d\n", trigger, n*DATA_BUFFER_SIZE);
+                fprintf(stderr, "Triggering ROP at step %u of %u\n", trigger, n*DATA_BUFFER_SIZE);
             }
             sim_string_ops(n, trigger);
             break;
