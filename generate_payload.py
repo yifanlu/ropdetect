@@ -47,6 +47,7 @@ class ROPGenerate:
       mygadget['gadget'] = ''
       if thumb:
         mygadget['vaddr'] = mygadget['vaddr'] | 1;
+      first = True
       for insn in self.__md.disasm(gadget['bytes'], gadget['vaddr']):
         mem_base_reg = ARM_REG_INVALID
         mem_imm = 0
@@ -56,6 +57,9 @@ class ROPGenerate:
         mygadget['gadget'] += '%s %s ; ' % (insn.mnemonic, insn.op_str) 
         for i in insn.operands:
           if i.type == ARM_OP_MEM:
+            if not first:
+              invalid = True
+              break # no support data instruction after reg instruction
             if i.mem.index != 0 or i.mem.scale != 1 or i.mem.disp != 0:
               invalid = True
               break # no support for these types
@@ -69,6 +73,7 @@ class ROPGenerate:
           else:
             invalid = True
             break # no support for these operands
+        first = False
         if invalid:
           break
         if mem_base_reg != ARM_REG_INVALID and mem_imm < MAX_SCRATCH_SIZE:
