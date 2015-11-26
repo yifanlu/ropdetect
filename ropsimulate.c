@@ -136,6 +136,7 @@ static void sim_string_ops(unsigned int n, unsigned int trigger)
 
     _trigger = trigger;
     random_data[DATA_BUFFER_SIZE-1] = '\0';
+    steps = 0;
     for (i = 0; i < n; i++)
     {
         s1 = (char *)&random_data[rand() % (n/2)];
@@ -189,7 +190,7 @@ static void sim_string_ops(unsigned int n, unsigned int trigger)
         {
             trigger_rop();
         }
-        if ((steps % 10000) < len2 + len1 + len)
+        if ((steps % 10000) == 0)
         {
             LOG("steps: %u", steps);
         }
