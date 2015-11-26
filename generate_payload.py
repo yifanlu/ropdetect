@@ -74,6 +74,9 @@ class ROPGenerate:
             if i.reg == ARM_REG_SP or i.reg == ARM_REG_PC:
               touch_sp_pc = True
             regs += [i.reg]
+          elif i.shift.type in (ARM_SFT_ASR_REG, ARM_SFT_LSL_REG, ARM_SFT_LSR_REG, ARM_SFT_ROR_REG, ARM_SFT_RRX_REG):
+            invalid = True
+            break # possible illegal instructions with reg based shifts. (capstone does not recognize ror pc as invalid)
           else:
             invalid = True
             break # no support for these operands
