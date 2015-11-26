@@ -189,7 +189,7 @@ static void sim_string_ops(unsigned int n, unsigned int trigger)
         {
             trigger_rop();
         }
-        if ((steps % 10000) == 0)
+        if ((steps % 10000) < len2 + len1 + len)
         {
             LOG("steps: %u", steps);
         }
