@@ -349,11 +349,11 @@ int main(int argc, const char *argv[])
         case TYPE_MIXED:
         {
             n = 1000000;
-            trigger = rop_payload ? rand() % n*DATA_BUFFER_SIZE : 0;
+            trigger = rop_payload ? rand() % n*DATA_BUFFER_SIZE/2 : 0;
             fprintf(stderr, "Simulating mixed load...\n");
             if (trigger > 0)
             {
-                fprintf(stderr, "Triggering ROP at step %u of %u\n", trigger, n*DATA_BUFFER_SIZE);
+                fprintf(stderr, "Triggering ROP at step %u of %u\n", trigger, n*DATA_BUFFER_SIZE/2);
             }
             sim_string_ops(n, trigger);
             break;
