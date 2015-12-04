@@ -132,7 +132,8 @@ provides support for many packages that we wish to run test with.
 \subsection*{Data Collection}
 
 In our multi-core system, we arbitrary assign one core to be the ``target'' and one core to be the ``monitor''. 
-The monitor collects events from the PMU registers owned by the target core. In order 
+We use the Linux boot option \textsc{isolcpus} to isolate those cores from the scheduler to claim 
+exclusive access. The monitor collects events from the PMU registers owned by the target core. In order 
 to minimize error caused by interrupts on the monitor core, we claim exclusive access on the monitor core 
 such that no other process runs on that core. Similarly, to avoid having to collect data on the remaining 
 cores, we ensure that all other processes run on the target core. Even though the system is multi-core, we 
@@ -152,11 +153,6 @@ In the current implementation, we process the data with a Python process running
 separate from both the target and the monitor. This is because we want minimal interference 
 of the actual data processing from both the data collection and the data generation. In 
 section ??, we provide reasons that relaxing this requirement will not hurt the results.
-
-\subsection*{Kernel Events Filtering}
-
-(To be determined if we want to implement this. The idea is to take kernel events such 
-as context switches and current running PID in order to group and filter the data.)
 
 \subsection*{Event Selection}
 
@@ -207,6 +203,61 @@ ID & Description & Included \\
 \caption{PMU events considered}
 \label{fig:events}
 \end{figure}
+
+\subsection*{ROP Simulation}
+
+There is a lack of a large sample of public ARM ROP payloads. Because of this, we decided that rather than target a 
+specific application, we create a simulation platform that simulates common workloads and triggers ROP execution 
+randomly while running the workload. We note that the applicability of our results depends on the accuracy of the 
+simulation platform.
+
+``ropsimulate'' takes, as input, a random seed, a workload, and a ROP payload. If the payload is not specified, the 
+workload will run to completion. Otherwise, at a random step in executing the workload, the stack pointer will be 
+set to point to the ROP payload (simulating a flow control redirection exploit). We have currently implemented three 
+workloads. Each workload operates on an array of size 32*512KiB (L2 cache size) that is initialized to random data.
+
+\subsubsection*{Data Bound}
+
+We interpret the random data as a square matrix and perform a matrix multiplication of the square of the matrix. 
+Intuitively, this workload generates a lot of data memory traffic and few instruction memory traffic. Branch prediction 
+should be good because the multiplication is implemented two tight inner loops. Because of this, we think of this 
+kind of workload as a ``best case'' scenario for our classifier.
+
+\subsubsection*{Branch Bound}
+
+We define 256 random functions, each takes a single byte as parameter and returns the sum of the byte and a random (defined 
+statically at compile-time) number (modulo 256). All the functions are stored in a function pointer table. For up to 
+10,000,000 iterations, we select a function from the table at the index indicated from the next byte in the random 
+array. We pass in the previous return value (initially zero) as the parameter. The workload is essentially performs 
+many indirect jumps to different locations and therefore branch prediction should not perform well. Instruction 
+fetches occur because of the large number of different functions called, but data fetches is limited to the sequential 
+access of the random array. Because of the similarity of this workload to ROP execution, we consider this the 
+``worst case'' scenario for our classifier.
+
+\subsubsection*{Mixed}
+
+For 1,000,000 iterations, we pick a random index in our random data array and cast the data to a string starting at 
+that index. We then pick a second random string using the same procedure, but making sure the second string is 
+located after the first string. Then we run one of ten random C standard library string operations on these two 
+strings. Because of the string operations, there should be plenty of data traffic. Because of the random function calls, 
+there should also be instruction fetches and branches misses. We consider this the ``average case'' for our classifier.
+
+\subsection*{ROP Generation}
+
+We also created a tool to generate random ROP payloads for testing. We used ROPgadget\cite{ROPgadget} along with the 
+Capstone\cite{Capstone} disassembly library to find valid gadgets and filter out ones that do not end with a ``pop'' of 
+the program counter. Our tool takes a random seed, the address of the end gadget (in our case, it calls a function 
+that terminates execution), the requested size of the generated payload, the weight of memory access gadgets, and 
+the executable to search in (in our case, the ``ropsimulate'' binary). It then picks random gadgets found in the 
+executable, makes sure it is not a gadget that causes uncontrolled behavior (for example, making a system call), and 
+writes the address of the gadget as well as random data used by the gadget to the output. If the gadget reads/writes 
+to memory, we make sure that the registers used for memory access are set to the scratch buffer region by another 
+gadget that controls those registers.
+
+The ``ropgenerate'' tool allows us to create arbitrary sized payloads with memory access as well as data operations. 
+The one missing feature from our generator that is found in ROP payloads in the wild is the ability to make function 
+and system calls. We did not implement this because it would complicate the generation process, but it can be improved 
+in future work.
 
 \subsection*{Sample Rate}
 
