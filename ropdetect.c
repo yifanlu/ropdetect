@@ -300,13 +300,13 @@ static int monitor_thread(void *data)
     if (cycles - prev_cycles >= collect_period)
     {
       update_counts();
+      prev_cycles = cycles;
     }
     if (ioread32(pmu_regs+PMU_PMOVSR) != 0)
     {
       // overflow
       reset_counts();
     }
-    prev_cycles = cycles;
   }
   printk(KERN_DEBUG "Monitor process stopping.\n");
   cleanup_events();
