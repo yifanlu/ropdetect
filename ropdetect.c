@@ -15,7 +15,7 @@
 
 #define CPU_TARGET 3
 #define CPU_MONITOR 2
-#define CACHE_BUFFER_SIZE 0x1000000
+#define CACHE_BUFFER_SIZE 0x100000
 
 #define PMU_REGS_OFFSET 0x1000
 #define PMU_REGS_SIZE 0x1000
@@ -289,6 +289,8 @@ static int monitor_thread(void *data)
 
   // setup event collection
   setup_events();
+  write_idx = 1;
+  read_idx = 0;
   reset_counts();
 
   prev_cycles = 0;
