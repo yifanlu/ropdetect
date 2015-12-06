@@ -12,8 +12,8 @@
 #define DRIVER_AUTHOR "Yifan Lu <yifanlu@stanford.edu>"
 #define DRIVER_DESC   "ROP detection through pref monitor"
 
-#define CPU_TARGET 0
-#define CPU_MONITOR 1
+#define CPU_TARGET 3
+#define CPU_MONITOR 2
 #define CACHE_BUFFER_SIZE 0x10000
 
 #define PMU_REGS_OFFSET 0x1000
