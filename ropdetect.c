@@ -118,7 +118,7 @@ static int init_ropdetect(void)
   phys_addr_t pmu_base;
   unsigned int pmcr;
 
-  if ((buffer = kmalloc(CACHE_BUFFER_SIZE, GFP_KERNEL)) == NULL)
+  if ((buffer = kmalloc(CACHE_BUFFER_SIZE * sizeof(*buffer), GFP_KERNEL)) == NULL)
   {
     printk(KERN_ALERT "Unable to allocate buffer for collection\n");
     return -1;
