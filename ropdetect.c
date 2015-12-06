@@ -4,6 +4,7 @@
 #include <linux/ioport.h>
 #include <linux/proc_fs.h>
 #include <linux/kthread.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/smp.h>
@@ -14,7 +15,7 @@
 
 #define CPU_TARGET 3
 #define CPU_MONITOR 2
-#define CACHE_BUFFER_SIZE 0x10000
+#define CACHE_BUFFER_SIZE 0x1000000
 
 #define PMU_REGS_OFFSET 0x1000
 #define PMU_REGS_SIZE 0x1000
@@ -84,7 +85,7 @@ static struct resource *pmu_resource;
 static void *pmu_regs;
 static struct task_struct *monitor_task;
 
-static pmu_events_t buffer[CACHE_BUFFER_SIZE];
+static pmu_events_t *buffer;
 static int read_idx;
 static int write_idx;
 static int num_counters;
@@ -116,6 +117,12 @@ static int init_ropdetect(void)
 {
   phys_addr_t pmu_base;
   unsigned int pmcr;
+
+  if ((buffer = kmalloc(CACHE_BUFFER_SIZE, GFP_KERNEL)) == NULL)
+  {
+    printk(KERN_ALERT "Unable to allocate buffer for collection\n");
+    return -1;
+  }
 
   if (smp_call_function_single(CPU_TARGET, get_current_debug_regs, &pmu_phys_base, 1) < 0)
   {
@@ -184,6 +191,7 @@ static void cleanup_ropdetect(void)
   release_mem_region(pmu_phys_base+PMU_REGS_OFFSET, PMU_REGS_SIZE);
   iounmap(pmu_regs);
   remove_proc_entry("ropdetect", NULL);
+  kfree(buffer);
 }
 
 static void setup_events(void)
