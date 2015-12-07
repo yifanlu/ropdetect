@@ -19,7 +19,11 @@ static unsigned char random_data[DATA_BUFFER_SIZE];
 static int debug_log;
 static char *rop_payload;
 
+#ifdef NO_LOGGING
+#define LOG(fmt, ...)
+#else
 #define LOG(fmt, ...) do { if (debug_log) fprintf(stderr, "[%s:%d] " fmt "\n", __FUNCTION__, __LINE__, __VA_ARGS__); } while (0)
+#endif
 
 static void __attribute__((naked,noreturn)) trigger_rop(void)
 {

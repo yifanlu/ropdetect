@@ -14,7 +14,7 @@ ropdetect: ropdetect_user.o
 	$(CC) $(LDFLAGS) -o $@ $?
 
 ropsimulate: ropsimulate.c
-	$(CC) -static -O0 -march=armv7-a -mthumb-interwork -mthumb -fno-pic -fno-pie -o $@ $?
+	$(CC) -DNO_LOGGING -static -O0 -march=armv7-a -mthumb-interwork -mthumb -fno-pic -fno-pie -o $@ $?
 
 clean:
 	rm -rf ropdetect ropsimulate *.o *~ core .depend .*.cmd *.ko *.mod.c
