@@ -123,6 +123,7 @@ static int init_ropdetect(void)
     printk(KERN_ALERT "Unable to allocate buffer for collection\n");
     return -1;
   }
+  memset(buffer, 0, CACHE_BUFFER_SIZE * sizeof(*buffer));
 
   if (smp_call_function_single(CPU_TARGET, get_current_debug_regs, &pmu_phys_base, 1) < 0)
   {
@@ -265,6 +266,10 @@ static inline void update_counts(void)
 static inline void get_counts(pmu_events_t *counter)
 {
   *counter = buffer[read_idx];
+  if (buffer[read_idx].reset)
+  {
+    buffer[read_idx].reset = 0;
+  }
   if (read_idx != write_idx-1)
   {
     read_idx = (read_idx + 1) % CACHE_BUFFER_SIZE;
