@@ -5,26 +5,31 @@ def extractPoint(f, cluster_points, max_event_counters, time_delta, state):
   i = 0
   is_data = 1
 
-  while i < cluster_points:
-    raw = f.read(12+4*max_event_counters)
-    if not raw:
-      is_data = 0
+  while sum(point) < 100*cluster_points:
+    point = []
+    i = 0
+    while i < cluster_points:
+      raw = f.read(12+4*max_event_counters)
+      if not raw:
+        is_data = 0
+        break
+      data = struct.unpack('iII%dI' % max_event_counters, raw)
+      reset, cycles, num_counters, events = data[0], data[1], data[2], data[3:]
+      if state[0] == 0 or reset == 1:
+        state[1] = cycles
+        state[2] = events
+        state[0] = 1
+      #if cycles - prev_cycles > 0:
+        #print("cycle:%d prev_cycle:%d diff:%d"%(cycles, prev_cycles, cycles - prev_cycles))
+      if cycles - state[1] >= time_delta:
+        state[3] += cycles - state[1]
+        for j in range(max_event_counters):
+          point.append(events[j] - state[2][j])
+        state[2] = events
+        state[1] = cycles
+        i += 1
+    if is_data == 0:
       break
-    data = struct.unpack('iII%dI' % max_event_counters, raw)
-    reset, cycles, num_counters, events = data[0], data[1], data[2], data[3:]
-    if state[0] == 0 or reset == 1:
-      state[1] = cycles
-      state[2] = events
-      state[0] = 1
-    #if cycles - prev_cycles > 0:
-      #print("cycle:%d prev_cycle:%d diff:%d"%(cycles, prev_cycles, cycles - prev_cycles))
-    if cycles - state[1] >= time_delta:
-      state[3] += cycles - state[1]
-      for j in range(max_event_counters):
-        point.append(events[j] - state[2][j])
-      state[2] = events
-      state[1] = cycles
-      i += 1
   return [point, is_data]
 
 def getSetNames(argv):
