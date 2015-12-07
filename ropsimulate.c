@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define ROP_SCRATCH_SPACE 1024
-#define DATA_BUFFER_SIZE 16777216 // 16*L2 size
+#define DATA_BUFFER_SIZE 16777216 // 32*L2 size
 #define TYPE_DATA 0
 #define TYPE_BRANCH 1
 #define TYPE_MIXED 2
@@ -360,5 +360,7 @@ int main(int argc, const char *argv[])
         }
     }
 
+    fprintf(stderr, "Simulation ended.\n");
+    exit(0);
     return 0;
 }
