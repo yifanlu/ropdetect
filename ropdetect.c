@@ -89,7 +89,6 @@ static pmu_events_t *buffer;
 static int read_idx;
 static int write_idx;
 static int num_counters;
-static volatile int is_reading;
 static volatile int has_read;
 
 static int monitor_thread(void *data);
@@ -266,7 +265,6 @@ static inline void update_counts(void)
     }
     buffer[read_idx].reset = 0;
     read_idx = (read_idx + 1) & ~CACHE_BUFFER_SIZE;
-    while (is_reading); // hopefully this won't take too long
     has_read = 0;
   }
 }
@@ -275,9 +273,7 @@ static inline void update_counts(void)
 // is called faster than update_counts, the same count will be read
 static inline void get_counts(pmu_events_t *counter)
 {
-  is_reading = 1;
   memcpy(counter, &buffer[read_idx], sizeof(*counter));
-  is_reading = 0;
   has_read = 1;
 }
 
@@ -302,7 +298,6 @@ static int monitor_thread(void *data)
   write_idx = 1;
   read_idx = 0;
   has_read = 0;
-  is_reading = 0;
   reset_counts();
 
   prev_cycles = 0;
