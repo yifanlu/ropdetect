@@ -2,6 +2,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 
@@ -47,7 +48,7 @@ static void sim_matrix_mul(unsigned int n, unsigned int trigger)
         {
             for (k = 0; k < n; k++)
             {
-                sum += random_data[i*n+k]*random_data[k*n+j];
+                sum += random_data[k*n+i]*random_data[k*n+j];
                 steps++;
                 if (_trigger > 0 && steps >= _trigger)
                 {
@@ -292,6 +293,7 @@ int main(int argc, const char *argv[])
     int type;
     size_t len, pos, k;
     unsigned int i, n, trigger;
+    uint32_t *buffer;
 
     fp = NULL;
     if (parse_args(argc, argv, &fp, &type))
@@ -319,9 +321,11 @@ int main(int argc, const char *argv[])
     }
 
     fprintf(stderr, "Generating random data...\n");
-    for (i = 0; i < DATA_BUFFER_SIZE; i++)
+    buffer = (uint32_t *)random_data;
+    buffer[0] = rand();
+    for (i = 1; i < DATA_BUFFER_SIZE/4; i++)
     {
-        random_data[i] = rand() % 256;
+        random_data[i] = 0x91E6D6A5 * random_data[i-1] - 0x6E19295B;
     }
 
     switch (type)
@@ -340,7 +344,7 @@ int main(int argc, const char *argv[])
         }
         case TYPE_BRANCH:
         {
-            n = 10000000;
+            n = DATA_BUFFER_SIZE;
             trigger = rop_payload ? rand() % n : 0;
             fprintf(stderr, "Simulating branch intensive load...\n");
             if (trigger > 0)
@@ -352,7 +356,7 @@ int main(int argc, const char *argv[])
         }
         case TYPE_MIXED:
         {
-            n = 1000000;
+            n = DATA_BUFFER_SIZE;
             trigger = rop_payload ? rand() % (n*DATA_BUFFER_SIZE/2) : 0;
             fprintf(stderr, "Simulating mixed load...\n");
             if (trigger > 0)
