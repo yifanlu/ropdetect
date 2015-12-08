@@ -15,7 +15,7 @@
 
 #define CPU_TARGET 3
 #define CPU_MONITOR 2
-#define CACHE_BUFFER_SIZE 0x10000
+#define CACHE_BUFFER_SIZE 0x10000 // must be power of 2
 
 #define PMU_REGS_OFFSET 0x1000
 #define PMU_REGS_SIZE 0x1000
@@ -89,6 +89,7 @@ static pmu_events_t *buffer;
 static int read_idx;
 static int write_idx;
 static int num_counters;
+static int has_read;
 
 static int monitor_thread(void *data);
 static int ropdetect_proc_read(struct file *filp, char *buf, size_t count, loff_t *offp);
@@ -242,8 +243,7 @@ static inline void reset_counts(void)
   counter->reset = 1;
 }
 
-// the follow two functions are not thread safe, but we lose accuracy in exchange 
-// for speed
+// assumption: this runs FAR faster than get_counts
 static inline void update_counts(void)
 {
   int i;
@@ -256,13 +256,16 @@ static inline void update_counts(void)
   {
     counter->events[i] = ioread32(pmu_regs+PMU_PMXEVCNTR0+4*i);
   }
-  write_idx = (write_idx + 1) % CACHE_BUFFER_SIZE;
-  if (read_idx == write_idx) // push read ahead
+  write_idx = (write_idx + 1) & ~CACHE_BUFFER_SIZE;
+  if (has_read || read_idx == write_idx) // push read ahead
   {
-    read_idx = (write_idx + 1) % CACHE_BUFFER_SIZE;
+    read_idx = (read_idx + 1) & ~CACHE_BUFFER_SIZE;
+    has_read = 0;
   }
 }
 
+// for thread safety, we do not change the read_idx, so if this function 
+// is called faster than update_counts, the same count will be read
 static inline void get_counts(pmu_events_t *counter)
 {
   *counter = buffer[read_idx];
@@ -270,10 +273,7 @@ static inline void get_counts(pmu_events_t *counter)
   {
     buffer[read_idx].reset = 0;
   }
-  if (read_idx != write_idx-1)
-  {
-    read_idx = (read_idx + 1) % CACHE_BUFFER_SIZE;
-  }
+  has_read = 1;
 }
 
 static int monitor_thread(void *data)
@@ -296,6 +296,7 @@ static int monitor_thread(void *data)
   setup_events();
   write_idx = 1;
   read_idx = 0;
+  has_read = 0;
   reset_counts();
 
   prev_cycles = 0;
