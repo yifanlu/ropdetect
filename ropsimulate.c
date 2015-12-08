@@ -356,7 +356,7 @@ int main(int argc, const char *argv[])
         }
         case TYPE_MIXED:
         {
-            n = DATA_BUFFER_SIZE;
+            n = DATA_BUFFER_SIZE/32;
             trigger = rop_payload ? rand() % (n*DATA_BUFFER_SIZE/2) : 0;
             fprintf(stderr, "Simulating mixed load...\n");
             if (trigger > 0)
