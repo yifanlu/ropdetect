@@ -12,10 +12,10 @@ prev_events = [0, 0, 0, 0]
 start_time = 0
 first = 0
 start = 0
+offset = 0
 cycles_list = []
 events_list = []
-with open(output, 'wb') as csvfile:
-  writer = csv.writer(csvfile)
+with open(output, 'wb') as outfile:
   with open(filename, "rb") as f:
     while True:
       raw = f.read(12+4*MAX_EVENT_COUNTERS)
@@ -71,6 +71,6 @@ with open(output, 'wb') as csvfile:
       start_time = cycles_list[i] - (cycles_list[i-1] - start_time)
     if not start and sum(events_list[i]) - sum(events_list[i-1]) > 0:
       start = 1
+      offset = cycles_list[i] - start_time
     if start and cycles_list[i] - cycles_list[i-1] > 0:
-      writer.writerow([str(cycles_list[i] - start_time), str(events_list[i][0] - events_list[i-1][0]), str(events_list[i][1] - events_list[i-1][1]), str(events_list[i][2] - events_list[i-1][2]), str(events_list[i][3] - events_list[i-1][3])])
-      #writer.writerow([str(cycles_list[i]), str(events_list[i][0]), str(events_list[i][1]), str(events_list[i][2]), str(events_list[i][3])])
+      outfile.write(struct.pack('iII%dI' % MAX_EVENT_COUNTERS, reset, cycles_list[i] - start_time - offset, num_counters, events_list[i][0] - events_list[i-1][0], events_list[i][1] - events_list[i-1][1], events_list[i][2] - events_list[i-1][2], events_list[i][3] - events_list[i-1][3]))
