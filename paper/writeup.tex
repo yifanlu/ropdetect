@@ -82,7 +82,7 @@ single useful operation (such as a memory load or store) and then jumps to the
 next return pointer in the stack, she can inject a large number of return 
 pointers into the stack and control execution that way.
 
-Even though ROP attacks are very powerful\cite{unk}, most attackers only use it 
+Even though ROP attacks are very powerful, most attackers only use it 
 as the first stage of a multi-stage attack where ROP is used to bypass operating 
 system restrictions in order to escalate control of the compromised process to 
 control of the entire system. If we can differentiate ROP execution with normal 
@@ -137,8 +137,7 @@ exclusive access. The monitor collects events from the PMU registers owned by th
 to minimize error caused by interrupts on the monitor core, we claim exclusive access on the monitor core 
 such that no other process runs on that core. Similarly, to avoid having to collect data on the remaining 
 cores, we ensure that all other processes run on the target core. Even though the system is multi-core, we 
-only model a single-core system. Although this is limiting, we discuss in section ?? how we can relax 
-these requirements and allow our setup to work in a multi-core system.
+only model a single-core system.
 
 Because, by default, the PMU registers are only accessible by the supervisor and because 
 we wish to disable interrupts on the monitor core, we choose to implement the data source as a 
@@ -151,8 +150,7 @@ that allows reading of this buffer. Our implementation uses this virtual file to
 
 In the current implementation, we process the data with a Python process running on a core 
 separate from both the target and the monitor. This is because we want minimal interference 
-of the actual data processing from both the data collection and the data generation. In 
-section ??, we provide reasons that relaxing this requirement will not hurt the results.
+of the actual data processing from both the data collection and the data generation.
 
 \subsection*{Event Selection}
 
@@ -266,22 +264,12 @@ the data fast enough for our decision to aid the system in terminating a comprom
 Additionally, a high sample rate consumes too much resources and may not scale. However, if 
 we sample too slowly, we may not take advantage of temporal features in our classification.
 
-We measured that the number of cycles it takes to execute ROP payloads from our samples 
-is ?? and therefore, we set our sampling frequency to be ??.
-
-(Right now, we use a rate of 1,000 cycles with no justification.)
-
-\subsection*{Malware Samples}
-
-We (will) use the Metasploit framework to test exploits on popular applications. We only 
-consider payloads that contain a ROP stage.
+We set our sampling frequency to be 10,000 because it is the minimal number of cycles where we can sample at that rate continuously without fail. Since we currently perform our classification offline and sample using another core exclusively, we ignore the above issues.
 
 \section{Model}
 
 Motivated by Teng \textit{et al.}, we use a one-class Support Vector Machine (oc-SVM) 
 classifier that uses the non-linear Radial Basis Function (RBF) kernel\cite{DBLP:journals/corr/TangSS14}.
-
-(For the future, we want to try other algorithms and see if we can get better results.) 
 
 \subsection*{Features}
 
@@ -295,20 +283,29 @@ we have a spike of return calls without the preceding function call spike. There
 it would be useful to consider the concatenation of $N$ vectors from $N$ time-slices 
 such that we have a 4$N$-dimensional vector.
 
-\subsection*{Feature Selection}
-
-(For future work, we need to perform feature selection both on which 4 events 
-to consider and also on $N$)
-
 \subsection*{Training}
-
-Our training data comes from both normal use cases and also ROP payloads from Metasploit.
 
 \section{Results}
 
 \section{Future Work}
 
+There's three main areas where we can improve the results. First, we would like to collect better data. To improve this, we can improve the simulation platform to better simulate common tasks. Ideally, instead of a simulation, we can test it on actual applications that people run. Instead of simulating a workload, we can instead inject vulnerabilities into common applications and test our algorithms that way. We can also improve the ROP payload generation to support JOP (jumps instead of returns) as well as making function calls (something common to regular ROP payloads that we do not account for). We also should work on recognizing multiple processes and multiple cores, which would represent a more realistic execution environment.
+
+Second, we would like to speed up reaction time and also use less resources for the detection. It is impossible to realize both of these goals at once, so there will have to be a trade-off. Right now, we reserve a CPU core just for monitoring, but detection might be more effective with a dedicated hardware that performs both the data collection and processing. Creating a FPGA implementation might result in better performance. We have not attempted to perform the classification locally (we process the data externally) because we focused on getting high quality data rather than tractability. Once we start to optimize for performance, we will lose the fine granularity of the sample collection. The challenge will be to still get good data as will as process it in time to make a decision.
+
+Lastly, we wish to improve our classification algorithm. In our experiments, we did not make use of feature selection at all; instead we manually chose features based on our knowledge of computer architecture. There may be events we ignored from consideration that actually work well in our model. There may also be other ways of combining the event counts into features we have not considered. We also should consider other supervised and unsupervised algorithms to see if we can get better performance or reliability.
+
+\subsection*{Bypassing}
+
+We also consider an attacker who wishes to construct a payload that bypasses detection. We note that they can run our classification algorithm locally in order to test their payload against our model. The problem, for them, will be to find a vulnerability at a point of execution, along with gadgets selected strategically that can confuse the algorithm enough to bypass it. This is an area that is worth researching.
+
 \section{Conclusion}
+
+In continuing the work done earlier this year, we made another step towards a future of malware detection by classifying how code executes (versus the current standard of classifying what code executes). We showed that the PMU built into all modern ARM processors allow for fine grained access to architectural events that allows for detection of ROP payloads that are too small to recognize on x86\cite{DBLP:journals/corr/TangSS14}. We used [one sentence ML conclusion here]...
+
+Although our results are currently constrained to a simplified and unrealistic model (single process running on a single core) and our classification is done offline, we showed that there is promise in this avenue of work. [Bulk of ML based conclusion]
+
+We hope that our detection method, along with recent work on control-flow integrity (which attempts to block ROP execution) will help defend computer systems against modern attackers.
 
 {\footnotesize \bibliographystyle{acm}
 \bibliography{writeup}}
